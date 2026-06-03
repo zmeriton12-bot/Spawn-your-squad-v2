@@ -1,1 +1,332 @@
 
+-- UNIVERSAL MULTI-CYCLE AUTO-FARM (LAG-FREE + DYNAMIC SPEED MENU)
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- DEFAULT INITIAL SPEED
+_G.TeleportSpeed = 0.15 
+
+-- Safe UI Placement
+local TargetParent = nil
+pcall(function()
+    if CoreGui and not game:GetService("RunService"):IsStudio() then
+        TargetParent = CoreGui
+    end
+end)
+if not TargetParent then
+    TargetParent = LocalPlayer:WaitForChild("PlayerGui", 15)
+end
+
+if TargetParent:FindFirstChild("CustomAutoFarmGUI") then
+    TargetParent.CustomAutoFarmGUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CustomAutoFarmGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = TargetParent
+
+----------------------------------------------------------------
+-- PATHWAY COORDINATES (Block Spawner -> Delivery Unit)
+----------------------------------------------------------------
+
+local pathways = {
+    blueTank  = { Vector3.new(-56, 11, 172), Vector3.new(-35, 10, 111) },
+    blueBasic = { Vector3.new(-56, 11, 172), Vector3.new(-57, 10, 112) },
+    blueFast  = { Vector3.new(-56, 11, 172), Vector3.new(-76, 10, 112) },
+    
+    redTank   = { Vector3.new(-56, 11, -175), Vector3.new(-73, 10, -116) },
+    redBasic  = { Vector3.new(-56, 11, -175), Vector3.new(-56, 10, -118) },
+    redFast   = { Vector3.new(-56, 11, -175), Vector3.new(-33, 10, -120) }
+}
+
+local activeKey = nil -- Tracks which loop is currently running
+
+----------------------------------------------------------------
+-- HIGH-PERFORMANCE AUTOMATION ENGINE
+----------------------------------------------------------------
+
+local function actionTeleport(position)
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local rootPart = character.HumanoidRootPart
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        
+        if humanoid and humanoid.Health > 0 then
+            -- Kill old momentum to eliminate rubber-band lag
+            rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            
+            -- High-speed instant tool equipping bypass
+            local holdingTool = character:FindFirstChildOfClass("Tool")
+            if not holdingTool then
+                local backpack = LocalPlayer:FindFirstChild("Backpack")
+                if backpack then
+                    local blockTool = backpack:FindFirstChild("Block") or backpack:FindFirstChildOfClass("Tool")
+                    if blockTool then
+                        blockTool.Parent = character
+                    end
+                end
+            end
+        end
+        -- Move Character Location smoothly
+        rootPart.CFrame = CFrame.new(position)
+    end
+end
+
+-- Single, optimized ultra-stable tracking thread
+task.spawn(function()
+    local currentIndex = 1
+    while true do
+        if activeKey and pathways[activeKey] then
+            local currentCoords = pathways[activeKey]
+            local targetPos = currentCoords[currentIndex]
+            
+            if targetPos then
+                actionTeleport(targetPos)
+            end
+            
+            -- Alternate back and forth cleanly
+            currentIndex = (currentIndex == 1) and 2 or 1
+            task.wait(_G.TeleportSpeed)
+        else
+            currentIndex = 1
+            task.wait(0.2)
+        end
+    end
+end)
+
+----------------------------------------------------------------
+-- UI DESIGN & INTERFACE
+----------------------------------------------------------------
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 280, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -140, 0.4, -210)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -80, 0, 40)
+Title.Position = UDim2.new(0, 40, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "LAG-FREE FLUID CONTROLLER"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 13
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = MainFrame
+
+-- Close Button (Right Side)
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -35, 0, 5)
+CloseButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 14
+CloseButton.Font = Enum.Font.SourceSansBold
+CloseButton.Parent = MainFrame
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 5)
+CloseCorner.Parent = CloseButton
+
+-- Speed Menu Toggle Button (Left Side of Title/Close Button area)
+local SpeedMenuButton = Instance.new("TextButton")
+SpeedMenuButton.Size = UDim2.new(0, 30, 0, 30)
+SpeedMenuButton.Position = UDim2.new(0, 5, 0, 5)
+SpeedMenuButton.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+SpeedMenuButton.Text = "+"
+SpeedMenuButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedMenuButton.TextSize = 18
+SpeedMenuButton.Font = Enum.Font.SourceSansBold
+SpeedMenuButton.Parent = MainFrame
+
+local SpeedToggleCorner = Instance.new("UICorner")
+SpeedToggleCorner.CornerRadius = UDim.new(0, 5)
+SpeedToggleCorner.Parent = SpeedMenuButton
+
+----------------------------------------------------------------
+-- SIDE SPEED ADJUSTMENT PANEL
+----------------------------------------------------------------
+
+local SpeedFrame = Instance.new("Frame")
+SpeedFrame.Name = "SpeedFrame"
+SpeedFrame.Size = UDim2.new(0, 130, 0, 160)
+SpeedFrame.Position = UDim2.new(1, 5, 0, 0) -- Renders right next to the MainFrame
+SpeedFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+SpeedFrame.BorderSizePixel = 0
+SpeedFrame.Visible = false
+SpeedFrame.Parent = MainFrame
+
+local SpeedCorner = Instance.new("UICorner")
+SpeedCorner.CornerRadius = UDim.new(0, 8)
+SpeedCorner.Parent = SpeedFrame
+
+local SpeedTitle = Instance.new("TextLabel")
+SpeedTitle.Size = UDim2.new(1, 0, 0, 30)
+SpeedTitle.BackgroundTransparency = 1
+SpeedTitle.Text = "SPEED SETTINGS"
+SpeedTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedTitle.TextSize = 11
+SpeedTitle.Font = Enum.Font.SourceSansBold
+SpeedTitle.Parent = SpeedFrame
+
+local SpeedDisplay = Instance.new("TextLabel")
+SpeedDisplay.Size = UDim2.new(1, 0, 0, 40)
+SpeedDisplay.Position = UDim2.new(0, 0, 0, 30)
+SpeedDisplay.BackgroundTransparency = 1
+SpeedDisplay.Text = string.format("%.2fs", _G.TeleportSpeed)
+SpeedDisplay.TextColor3 = Color3.fromRGB(0, 255, 150)
+SpeedDisplay.TextSize = 22
+SpeedDisplay.Font = Enum.Font.SourceSansBold
+SpeedDisplay.Parent = SpeedFrame
+
+local function createSpeedAdjustButton(text, yPos, color, delta)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 100, 0, 35)
+    btn.Position = UDim2.new(0, 15, 0, yPos)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
+    btn.Parent = SpeedFrame
+    
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 5)
+    c.Parent = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        -- Modify teleport speed bound within 0.01s (insanely fast) and 2.0s (slow)
+        _G.TeleportSpeed = math.clamp(_G.TeleportSpeed + delta, 0.01, 2.0)
+        SpeedDisplay.Text = string.format("%.2fs", _G.TeleportSpeed)
+    end)
+end
+
+-- Delta is negative to make it FASTER (less delay), positive to make it SLOWER
+createSpeedAdjustButton("FASTER (-0.02)", 75, Color3.fromRGB(200, 60, 60), -0.02)
+createSpeedAdjustButton("SLOWER (+0.02)", 115, Color3.fromRGB(60, 140, 60), 0.02)
+
+----------------------------------------------------------------
+-- CYCLE BUTTON BUILDER
+----------------------------------------------------------------
+
+local buttonObjects = {}
+
+local function createMenuButton(text, pos, color, stateKey)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 240, 0, 45)
+    btn.Position = pos
+    btn.BackgroundColor3 = color
+    btn.Text = text .. ": OFF"
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.SourceSansBold
+    btn.Parent = MainFrame
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+    
+    buttonObjects[stateKey] = {
+        Object = btn,
+        DefaultColor = color,
+        BaseText = text
+    }
+    
+    btn.MouseButton1Click:Connect(function()
+        if activeKey == stateKey then
+            activeKey = nil
+            btn.Text = text .. ": OFF"
+            btn.BackgroundColor3 = color
+        else
+            for k, data in pairs(buttonObjects) do
+                data.Object.Text = data.BaseText .. ": OFF"
+                data.Object.BackgroundColor3 = data.DefaultColor
+            end
+            activeKey = stateKey
+            btn.Text = text .. ": ON"
+            btn.BackgroundColor3 = Color3.fromRGB(0, 180, 100)
+        end
+    end)
+end
+
+createMenuButton("Blue Tank Cycle", UDim2.new(0, 20, 0, 50), Color3.fromRGB(0, 80, 160), "blueTank")
+createMenuButton("Blue Basic Cycle", UDim2.new(0, 20, 0, 110), Color3.fromRGB(0, 110, 190), "blueBasic")
+createMenuButton("Blue Fast Cycle", UDim2.new(0, 20, 0, 170), Color3.fromRGB(0, 140, 220), "blueFast")
+
+createMenuButton("Red Tank Cycle", UDim2.new(0, 20, 0, 240), Color3.fromRGB(160, 40, 40), "redTank")
+createMenuButton("Red Basic Cycle", UDim2.new(0, 20, 0, 300), Color3.fromRGB(190, 60, 60), "redBasic")
+createMenuButton("Red Fast Cycle", UDim2.new(0, 20, 0, 360), Color3.fromRGB(220, 80, 80), "redFast")
+
+----------------------------------------------------------------
+-- INTERACTION EVENTS
+----------------------------------------------------------------
+
+-- Toggle Speed Panel Visibility
+SpeedMenuButton.MouseButton1Click:Connect(function()
+    SpeedFrame.Visible = not SpeedFrame.Visible
+    SpeedMenuButton.Text = SpeedFrame.Visible and "-" or "+"
+end)
+
+local HideButton = Instance.new("TextButton")
+HideButton.Size = UDim2.new(0, 100, 0, 35)
+HideButton.Position = UDim2.new(0, 15, 0, 15)
+HideButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+HideButton.Text = "Hide Menu"
+HideButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+HideButton.TextSize = 14
+HideButton.Font = Enum.Font.SourceSansBold
+HideButton.Parent = ScreenGui
+
+local HideCorner = Instance.new("UICorner")
+HideCorner.CornerRadius = UDim.new(0, 5)
+HideCorner.Parent = HideButton
+
+HideButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+    HideButton.Text = MainFrame.Visible and "Hide Menu" or "Show Menu"
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    activeKey = nil
+    ScreenGui:Destroy()
+end)
+
+-- Responsive Drag System
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then update(input) end
+end)
